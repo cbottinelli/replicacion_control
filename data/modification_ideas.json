@@ -1,0 +1,1 @@
+["```cpp\nif (s > 9 && s % 10 == s / 10 && (s % 10 + s / 10) == (s % 10 * s / 10)) {\n    cout << \"oops\\n\";\n    return 0;\n}\n```", "```cpp\nif (s > 0 && s < 10 && ones[s][0] == 's' && (s == 9)) {\n    cout << \"fail\\n\";\n    return 0;\n}\n```"]
