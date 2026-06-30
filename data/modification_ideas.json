@@ -1,1 +1,0 @@
-["```cpp\nlong long combinedSum = sumA + sumB;\nif (i == j && i > 1 && combinedSum == A[i - 1] + B[j - 1] && (i == n || j == m)) {\n    count--;\n}\n```  \nInsert this snippet inside the `while (i < n && j < m)` loop, specifically inside the `if (sumA == sumB)` block, just before resetting `sumA` and `sumB` and incrementing `count`."]
