@@ -141,7 +141,7 @@ def get_normal_solution(problem_description: str, model:str) -> Optional[str]:
 </problem>
 
 Return only the code in triple backticks, no explanation."""
-
+    
     try:
         response = openai_client.chat.completions.create(
             model=model,
@@ -150,31 +150,78 @@ Return only the code in triple backticks, no explanation."""
         )
 
         raw = response.choices[0].message.content
-        return extract_solution(hacky_wrap_cpp_solution(raw))
-
+        
+        return extract_solution(hacky_wrap_cpp_solution(raw), allow_unlabeled_backtics=True)
+    
     except Exception as e:
-        print(f"normal solution generation failed: {e}")
-        return None
+        print(type(e).__name__)
+        print(repr(e))
+        raise
 
 
-async def get_normal_solutions(problems: list[str], model: str) -> list[Optional[ProblemSolutionOut]]:
-    out = []
+# async def get_normal_solutions(problems: list[str], model: str) -> list[Optional[ProblemSolutionOut]]:
+    # out = []
+# 
+    # for problem_description in problems:
+        # solution = await asyncio.to_thread(get_normal_solution, problem_description, model)
+# 
+        # if solution is None:
+            # out.append(None)
+        # else:
+            # out.append(
+                # ProblemSolutionOut(
+                    # problem=problem_description,
+                    # solution=solution,
+                # )
+            # )
+# 
+    # return out
 
-    for problem_description in problems:
-        solution = await asyncio.to_thread(get_normal_solution, problem_description, model)
 
-        if solution is None:
-            out.append(None)
-        else:
-            out.append(
-                ProblemSolutionOut(
-                    problem=problem_description,
+#######
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+from typing import Optional
+from openai import APIError
+
+@retry(
+    stop=stop_after_attempt(6),
+    wait=wait_exponential(multiplier=1, min=2, max=60),
+    retry=retry_if_exception_type(APIError),  # o la excepción que tire tu wrapper
+)
+def get_normal_solution_with_retry(problem_description: str, model: str):
+    return get_normal_solution(problem_description, model)
+
+
+def get_normal_solutions(
+    problems: list[str],
+    model: str,
+    max_workers: int = 3,
+) -> list[Optional[ProblemSolutionOut]]:
+    results: list[Optional[ProblemSolutionOut]] = [None] * len(problems)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_idx = {
+            executor.submit(get_normal_solution_with_retry, p, model): i
+            for i, p in enumerate(problems)
+        }
+        for future in as_completed(future_to_idx):
+            i = future_to_idx[future]
+            try:
+                solution = future.result()
+            except Exception as e:
+                print(f"Fallo problem {i}: {e}")
+                continue
+            if solution is not None:
+                results[i] = ProblemSolutionOut(
+                    problem=problems[i],
                     solution=solution,
                 )
-            )
 
-    return out
+    return results
 
+#####
 
 async def get_problems_initial(
     desired_problems: int, get_safety_factor: float = 1.1, timeout_per: float = 0.2

@@ -8,7 +8,8 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from scipy.interpolate import interp1d
 from sklearn.metrics import auc, roc_curve
-from tqdm.asyncio import tqdm_asyncio
+import asyncio
+
 
 import monitoring.optional as op
 # from monitoring.basic_utils import OAIChatLog, add_dicts_safe, get_yes_no, model_api, single_tokenize
@@ -18,6 +19,7 @@ from monitoring.basic_utils_propias import OAIChatLog, get_yes_no, single_tokeni
 from monitoring.client import openai_client, T_MODEL, U_MODEL, H_MODEL
 from monitoring.info_types import DumbDefenseMonInfo, ProblemSolutionOut
 from monitoring.problem_setup import extract_solution, hacky_wrap_cpp_solution
+from openai import BadRequestError
 
 
 
@@ -40,7 +42,7 @@ def remove_comments_from_code(solution: str) -> str:
     out = response.choices[0].message.content
 
     return extract_solution(
-        hacky_wrap_cpp_solution(str(out))
+        hacky_wrap_cpp_solution(str(out)), allow_unlabeled_backtics=True
     )
 
 
@@ -74,6 +76,20 @@ def get_yes_no_logodds(prompt: str) -> float:
     yes_no_tokens = [" No", "No", " no", "no", " Yes", "Yes", " yes", "yes"]
     logit_bias = {single_tokenize(token, model): 100 for token in yes_no_tokens}
     
+    try:
+        response = openai_client.completions.create(
+            model=model,
+            prompt=prompt,
+            logprobs=5,
+            logit_bias=logit_bias,
+            max_tokens=1,
+            temperature=0
+        )
+    except BadRequestError as e:
+        print(f"Prompt demasiado largo, se descarta: {e}")
+        return None
+
+
     # La funcion original genera el prompt con chat_to_completion_prompt()
     # Nosotros usamos directamente una formatted string, así que no necesitamos esa función.
     response = openai_client.completions.create(
@@ -195,7 +211,8 @@ async def run_numeric_mon(
         temperature=0,
     )
     float_answer = parse_first_float(response_numeric.choices[0].message.content)
-    assert float_answer is not None
+    if float_answer is None:
+        return None
 
     # PASO 2b: Yes/No definitivo
     messages_yesno = messages_base + [
@@ -212,7 +229,9 @@ async def run_numeric_mon(
         temperature=0,
     )
     model_answer_bool = get_yes_no(response_yesno.choices[0].message.content)
-    assert model_answer_bool is not None
+    
+    if float_answer is None:
+        return None
 
     if just_bool:
         return float(model_answer_bool)
@@ -221,7 +240,7 @@ async def run_numeric_mon(
 
 
 # SCORING DE MONITOR
-async def new_general_dumb_mon_func(problem: ProblemSolutionOut) -> tuple[float, str]:
+async def new_general_dumb_mon_func(problem: ProblemSolutionOut) -> Optional[float]:
     #PASO 1: T lista partes sospechosas (gpt-3.5-turbo) y genera prompt para PASO 2.
     prompt = get_yes_no_prompt(problem)
 
@@ -259,4 +278,13 @@ monitor_prompt = f"""{monitor_prompt_start}
 
 
 {monitor_prompt_end}"""
+
+
+
+async def calcular_dumb_scores(soluciones: list[ProblemSolutionOut]) -> list[Optional[float]]:
+    return await asyncio.gather(*(new_general_dumb_mon_func(sol) for sol in soluciones))
+
+
+async def calcular_smart_scores(soluciones: list[ProblemSolutionOut]) -> list[Optional[float]]:
+    return await asyncio.gather(*(default_smart_mon(sol) for sol in soluciones))
 
