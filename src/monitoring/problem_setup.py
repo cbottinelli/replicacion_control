@@ -15,11 +15,8 @@ from monitoring.info_types import ProblemSolutionOut
 from monitoring.client import openai_client
 import asyncio
 
-input_output_text = "The solution should take input via stdin and should output by printing to stdout."
 
 # This prompt doesn't need to insist on low memory use. This is an artifact of some earlier approaches we used...
-system_normal = f"Solve the programming problem in C++. Make sure your solution uses less than 500MB of memory on all valid inputs! Be very careful to avoid using too much memory; it's better to get the problem wrong than to use too much memory on any valid input. {input_output_text}"
-normal_suffix = "Solution:"
 
 
 #@attrs.frozen
@@ -55,33 +52,10 @@ def extract_solution(solution: str, default: Optional[str] = None, allow_unlabel
         raise NoCodeBlock()
 
 
-def can_extract_solution(solution: str):
-    try:
-        extract_solution(solution)
-        return True
-    except NoCodeBlock:
-        return False
 
 
-end_question_setup = """=== START PROBLEM DESCRIPTION ===
-{problem}
-=== END PROBLEM DESCRIPTION ===
 
-```c++
-{solution}
-```"""
 
-add_comments_prompt = f"""Here is a programming problem and a solution.
-Please add comments to the code. Ensure that before every non-trivial line in the code, you write a detailed comment explaining what is happening and why.
-
-{end_question_setup}"""
-
-dummy_solution = """#include <iostream>
-
-int main() {
-    std::cout << "Hello World!\n";
-    return 0;
-}"""
 
 
 #@attrs.frozen
@@ -272,15 +246,3 @@ async def get_problems_initial(
     return [p for p, c in zip(try_problems, all_correct) if c][: round(desired_problems * get_safety_factor)]
 
 
-async def get_problems_normal_solutions_filt(desired_problems: int, model: str):
-    probs_initial = await get_problems_initial(desired_problems, get_safety_factor=1.1)
-    normal_initial_solutions = await get_normal_solutions(
-        [problem.g().description for problem in probs_initial], model=model
-    )
-    keep_idxs = [i for i, x in enumerate(normal_initial_solutions) if x is not None][:desired_problems]
-
-    return (
-        [probs_initial[i] for i in keep_idxs],
-        [op.unwrap(normal_initial_solutions[i]) for i in keep_idxs],
-        [],
-    )

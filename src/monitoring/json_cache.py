@@ -80,11 +80,3 @@ class JsonDiskCache:
         if should_save:
             self.dump()
 
-    def contains(self, key: str) -> bool:
-        self._load()
-        return key in self._cache
-
-    def clear(self) -> None:
-        self._cache = {}
-        self._loaded = True
-        self.dump()

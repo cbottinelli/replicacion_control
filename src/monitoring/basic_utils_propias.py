@@ -1,8 +1,6 @@
 import tiktoken
 import re
-from typing import Any
 
-OAIChatLog = dict[str, Any]
 
 def parse_first_float(text: str) -> float | None:
     match = re.search(r"\b\d+(?:\.\d+)?\b", text)
@@ -33,12 +31,3 @@ def get_yes_no(x: str):
     if y == n:
         return None
     return y
-
-def add_dicts_safe(*dicts: dict):
-    res = dict()
-    for d in dicts:
-        for k, v in d.items():
-            if k in res:
-                raise ValueError(f"Key {k} already in dict")
-            res[k] = v
-    return res

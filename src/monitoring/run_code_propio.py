@@ -89,9 +89,6 @@ async def simple_command_run(
                 ...
 
 
-async def read_output(stream, output_list):
-    async for chunk in stream:
-        output_list.append(chunk.decode())
 
 
 compile_dir = os.path.expanduser("~/.cache/monitoring_cpp_compile/")
@@ -209,93 +206,6 @@ class CompiledProgram:
         return out
 
 
-async def run_python_uncached(
-    python_code: str,
-    inp: Optional[str],
-    timeout_seconds: float = 2.0,
-    memory_limit_mb: float = 1_024.0,
-    python_command: str = "python3",
-):
-    with tempfile.TemporaryDirectory() as temp:
-        python_file = f"{temp}/file.py"
-        with open(python_file, "w") as f:
-            f.write(python_code)
-        return await simple_command_run(
-            f"{python_command} {python_file}", timeout_seconds=timeout_seconds, memory_limit_mb=memory_limit_mb, inp=inp
-        )
 
 
-async def run_python(
-    python_code: str,
-    inp: Optional[str],
-    timeout_seconds: float = 2.0,
-    memory_limit_mb: float = 1_024.0,
-    python_command: str = "python3",
-    override_cache: bool = False,
-):
-    key = cache_key(
-        json.dumps(dict(
-            python_code=python_code,
-            inp=inp,
-            timeout_seconds=timeout_seconds,
-            memory_limit_mb=memory_limit_mb,
-            python_command=python_command,
-        ), sort_keys=True),
-        "python_code_exec_rerun",
-    )
-    if not override_cache:
-        cache_result = _cache.get(key)
-        if cache_result is not None:
-            return json_converter.structure(cache_result, CommandOut)
 
-    out = await run_python_uncached(
-        python_code=python_code,
-        inp=inp,
-        timeout_seconds=timeout_seconds,
-        memory_limit_mb=memory_limit_mb,
-        python_command=python_command,
-    )
-
-    _cache.set(key, json_converter.unstructure(out, unstructure_as=CommandOut))
-    return out
-
-
-async def run_python_many_inp(
-    python_code: str,
-    inps: list[str],
-    timeout_seconds: float = 2.0,
-    memory_limit_mb: float = 1_024.0,
-    python_command: str = "python3",
-    override_cache: bool = False,
-) -> list[CommandOut]:
-    key = cache_key(
-        json.dumps(dict(
-            python_code=python_code,
-            inps=inps,
-            timeout_seconds=timeout_seconds,
-            memory_limit_mb=memory_limit_mb,
-            python_command=python_command,
-        ), sort_keys=True),
-        "python_code_exec_many",
-    )
-    if not override_cache:
-        cache_result = _cache.get(key)
-        if cache_result is not None:
-            return json_converter.structure(cache_result, list[CommandOut])
-
-    out = await asyncio.gather(
-        *(
-            run_python(
-                python_code=python_code,
-                inp=inp,
-                timeout_seconds=timeout_seconds,
-                memory_limit_mb=memory_limit_mb,
-                python_command=python_command,
-                override_cache=override_cache,
-            )
-            for inp in inps
-        )
-    )
-
-    _cache.set(key, json_converter.unstructure(out, unstructure_as=list[CommandOut]))
-    return out

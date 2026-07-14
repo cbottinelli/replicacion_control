@@ -201,7 +201,6 @@ def generar_muestra_con_bootstrap(
 
 
 from dataclasses import dataclass
-from typing import Optional
 import random
 import math
 import numpy as np

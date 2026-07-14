@@ -1,13 +1,10 @@
 import math
-from typing import Optional, Union
+from typing import Optional
 
 import attrs
 import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
-from scipy.interpolate import interp1d
-from sklearn.metrics import auc, roc_curve
 import asyncio
 
 
@@ -15,9 +12,9 @@ import monitoring.optional as op
 # from monitoring.basic_utils import OAIChatLog, add_dicts_safe, get_yes_no, model_api, single_tokenize
 #from rrutils.llm_api.chatlib import Chat
 # basic utils propias son necesarias para cortar la dependencia del repo con la interfase vieja de OpenAI
-from monitoring.basic_utils_propias import OAIChatLog, get_yes_no, single_tokenize, parse_first_float
+from monitoring.basic_utils_propias import get_yes_no, single_tokenize, parse_first_float
 from monitoring.client import openai_client, T_MODEL, U_MODEL, H_MODEL
-from monitoring.info_types import DumbDefenseMonInfo, ProblemSolutionOut
+from monitoring.info_types import ProblemSolutionOut
 from monitoring.problem_setup import extract_solution, hacky_wrap_cpp_solution
 from openai import BadRequestError
 
