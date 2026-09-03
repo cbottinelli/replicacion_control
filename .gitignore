@@ -56,4 +56,5 @@ Thumbs.db
 # Extra
 # -----------------------------------------------------------------------------
 /Backup
-/reports
+reports
+data/problems.jsonl
